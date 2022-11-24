@@ -1,3 +1,30 @@
+/*
+MIT License
+
+Copyright (c) 2022 Thomas W Shanley
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+*/
+
+// provides functional interface for selected capabilites in the extension 
+// code when (webpack) packed as a module.
+
 import { extractData } from "../extension/site/ancestry/core/ancestry_extract_data.mjs";
 import { generalizeData } from "../extension/site/ancestry/core/ancestry_generalize_data.mjs";
 import { buildCitation } from "../extension/site/ancestry/core/ancestry_build_citation.mjs";
@@ -5,62 +32,52 @@ import { buildCitation } from "../extension/site/ancestry/core/ancestry_build_ci
 import { getDefaultOptions } from "../extension/base/core/options/options_database.mjs";
 import { fetchAncestrySharingDataObj } from "../extension/site/ancestry/browser/ancestry_fetch.mjs";
 
-// this will take some work
-// async function getSharingDataObj(){
-//     try {
-//         let response = await fetchAncestrySharingDataObj(data.extractedData);
-    
-//         if (response.success) {
-//           ancestryPrefetch.prefetchedSharingDataObj = response.dataObj;
-//         } else {
-//           // It can fail even if there is an image URL, for example findagrave images:
-//           // https://www.ancestry.com/discoveryui-content/view/2221897:60527
-//           // This is not considered an error there just will be no sharing link
-//         }
-//       } catch (e) {
-//         console.log("getAncestrySharingDataObj caught exception on fetchAncestrySharingDataObj:");
-//         console.log(e);
-//       }    
-// }
+import { extractData as fgEx } from "../extension/site/fg/core/fg_extract_data.mjs";
+import { generalizeData as fgGd } from "../extension/site/fg/core/fg_generalize_data.mjs";
+import { buildCitation as fgBc } from "../extension/site/fg/core/fg_build_citation.mjs";
 
-export async function getCitation(doc) {
-    console.log("Enter getCitation");
-    console.log("Url is: " + doc.URL);
+async function getThisCite(doc, input, fnEx, fnGd, fnBc, fnSd) {
+    input.extractedData = fnEx(doc, doc.URL);
+
+    if (fnSd) {
+        let rezult = await fnSd(input.extractedData);
+        if (rezult.success) {
+            input.sharingDataObj = rezult.dataObj;
+        }
+    }
+
+    input.generalizedData = fnGd(input);
+
+    console.log("to call buildCitation with input:");
+    console.log(input);
+    let rv = fnBc(input);
+    return rv;
+}
+
+export async function getCitationFor(doc) {
+    console.log("Enter getCitationFor: " + doc.URL);
+
+    let domain = (new URL(doc.URL));
+    let hostname = domain.hostname;
 
     let input = [];
-    input.extractedData = extractData(doc, doc.URL);
-    let rezult = await fetchAncestrySharingDataObj(input.extractedData);
-    if (rezult.success) {
-        input.sharingDataObj = rezult.dataObj;
-    }
-    input.generalizedData = generalizeData(input);
-    
     input.runDate = new Date();
     input.type = "inline";
-
-    // test this out
-    // let realOptions = getDefaultOptions();
-    // console.log("realOptions: ");
-    // console.log(realOptions);
-    // let optionsMock = [];
-    // input.options = optionsMock;
-    // optionsMock.citation_ancestry_subscriptionRequired = true;
-    // optionsMock.citation_ancestry_dataStyle = "none";
-    // optionsMock.citation_general_addBreaksWithinBody = true;
-    // optionsMock.citation_general_dataListSeparator = "commaColon"; // "commaSpace"
-    // optionsMock.citation_general_addAccessedDate = "parenAfterLink";
-    // optionsMock.citation_ancestry_recordTemplateDomain = "default"; // "fromRecord"
-    // optionsMock.citation_general_referencePosition = "atEnd";
-    // optionsMock.citation_general_sourceReferenceSeparator = "commaColon"; // "commaSpace"
-
     input.options = getDefaultOptions();
 
-    console.log("to call buildCitation with: ");
-    console.log(input);
-    let rv = buildCitation(input);
-    console.log("return getCitation");
+    let rv = "unrecognized hostname " + hostname;
+
+    if (hostname.includes("ancestry."))
+        rv = await getThisCite(doc, input, extractData, generalizeData, buildCitation, fetchAncestrySharingDataObj);
+    else if (hostname.includes("findagrave."))
+        rv = await getThisCite(doc, input, fgEx, fgGd, fgBc, null);
+    else
+        return rv;
+
+    console.log("return getCitation with rv:");
     console.log(rv);
     return rv.citation;
 }
+
 
 

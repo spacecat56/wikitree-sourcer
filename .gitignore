@@ -24,3 +24,5 @@ xcuserdata/
 
 browser_variants/firefox/*
 !browser_variants/firefox/manifest.json
+/.vs/wikitree-sourcer/v16/.suo
+/dist/main.js
