@@ -112,12 +112,13 @@ async function fetchAncestrySharingDataObjGivenIds(imageDbId, imageRecordId, rec
 }
 
 async function getLastSharingData() {
-  return await getLocalStorageItem("ancestry_lastSharingData");
+  return await getLocalStorageItem("ancestry_lastSharingData").catch( error => { });
 }
 
 async function setLastSharingData(lastSharingData) {
   let items = { ancestry_lastSharingData: lastSharingData };
-  chrome.storage.local.set(items);
+  try { chrome.storage.local.set(items)} catch (err) 
+  {console.log("Failed to write lastSharingData to chrome.storage.local:" + err.message); console.log(lastSharingData);};
 }
 
 async function fetchAncestrySharingDataObj(ed) {

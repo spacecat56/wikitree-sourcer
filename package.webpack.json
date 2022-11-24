@@ -1,0 +1,23 @@
+{
+  "name": "webpack-ancestry-cites",
+  "version": "1.0.0",
+  "description": "",
+  "private": true,
+  
+  "dependencies": {
+    "git-filter-repo": "0.0.30",
+    "jsdom": "^16.7.0",
+    "web-ext": "^6.8.0"
+  },
+  "devDependencies": {
+      "webpack": "^5.38.1",
+      "webpack-cli": "^4.7.2"
+  },
+  "scripts": {
+      "test": "echo \"Error: no test specified\" && exit 1",
+	  "build": "webpack"
+  },
+  "lint-staged": {
+    "**/*": "prettier --write --ignore-unknown"
+  }
+}
