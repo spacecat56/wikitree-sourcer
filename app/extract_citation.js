@@ -65,18 +65,22 @@ export async function getCitationFor(doc) {
     input.type = "inline";
     input.options = getDefaultOptions();
 
-    let rv = "unrecognized hostname " + hostname;
+    let rv = {url: doc.URL, message: "unrecognized hostname " + hostname, citation: null};
+    //let rv["message"] = "unrecognized hostname " + hostname;
 
+    let citationObject = null;
     if (hostname.includes("ancestry."))
-        rv = await getThisCite(doc, input, extractData, generalizeData, buildCitation, fetchAncestrySharingDataObj);
+        citationObject = await getThisCite(doc, input, extractData, generalizeData, buildCitation, fetchAncestrySharingDataObj);
     else if (hostname.includes("findagrave."))
-        rv = await getThisCite(doc, input, fgEx, fgGd, fgBc, null);
+        citationObject = await getThisCite(doc, input, fgEx, fgGd, fgBc, null);
     else
         return rv;
 
-    console.log("return getCitation with rv:");
+    rv.citation = citationObject.citation;
+    rv.message = "returning citation of type: " + citationObject.type;
+    console.log("getCitationFor returns:");
     console.log(rv);
-    return rv.citation;
+    return rv;
 }
 
 
