@@ -54,8 +54,12 @@ async function getThisCite(doc, input, fnEx, fnGd, fnBc, fnSd) {
     return rv;
 }
 
-export async function getCitationFor(doc) {
+export async function getCitationFor(doc, options = null) {
     console.log("Enter getCitationFor: " + doc.URL);
+    if (options) {
+        console.log("options:");
+        console.log(options);
+    }
 
     let domain = (new URL(doc.URL));
     let hostname = domain.hostname;
@@ -64,6 +68,15 @@ export async function getCitationFor(doc) {
     input.runDate = new Date();
     input.type = "inline";
     input.options = getDefaultOptions();
+    if (options) {
+        // apply the option overrides
+        for (var i = 0; i < options.length; i += 2) {
+            if (options[i] === "type")
+                input.type = options[i + 1];
+            else
+                input.options[options[i]] = options[i + 1];
+        }
+    }
 
     let rv = {url: doc.URL, message: "unrecognized hostname " + hostname, citation: null};
     //let rv["message"] = "unrecognized hostname " + hostname;
