@@ -22,9 +22,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 
-async function doFetch() {
-  //console.log('doFetch, document.location is: ' + document.location);
-
+export async function doFetch() {
   let fetchType = "record";
 
   let fetchUrl = document.location.href;
@@ -134,7 +132,13 @@ async function doFetch() {
 }
 
 async function extractDataFromFetchAndRespond(document, dataObj, fetchType, options, sendResponse) {
-  //console.log('extractDataFromFetchAndRespond entered');
+    console.log('extractDataFromFetchAndRespond entered');
+    console.log(document);
+    console.log(dataObj);
+    console.log(fetchType);
+    console.log(options);
+    console.log(sendResponse);
+
 
   if (!isLoadedExtractDataModuleReady) {
     if (loadedExtractDataModuleFailed) {
@@ -262,4 +266,6 @@ function extractHandler(request, sendResponse) {
   }
 }
 
-siteContentInit(`fs`, `site/fs/core/fs_extract_data.mjs`, extractHandler);
+// mod for use as a module
+try { siteContentInit(`fs`, `site/fs/core/fs_extract_data.mjs`, extractHandler) }
+catch { };

@@ -24,10 +24,13 @@ SOFTWARE.
 
 // provides functional interface for selected capabilites in the extension 
 // code when (webpack) packed as a module.
+// NB a few places in the extension need to be modified, mininimally 
+// to catch and swallow execptions, because the browser stack calls 
+// apis that are not acessible in the CEF environment.
 
-import { extractData } from "../extension/site/ancestry/core/ancestry_extract_data.mjs";
-import { generalizeData } from "../extension/site/ancestry/core/ancestry_generalize_data.mjs";
-import { buildCitation } from "../extension/site/ancestry/core/ancestry_build_citation.mjs";
+import { extractData as ancEx } from "../extension/site/ancestry/core/ancestry_extract_data.mjs";
+import { generalizeData as ancGd } from "../extension/site/ancestry/core/ancestry_generalize_data.mjs";
+import { buildCitation as ancBc } from "../extension/site/ancestry/core/ancestry_build_citation.mjs";
 // import { buildHouseholdTable } from "../extension/base/core/table_builder.mjs";
 import { getDefaultOptions } from "../extension/base/core/options/options_database.mjs";
 import { fetchAncestrySharingDataObj } from "../extension/site/ancestry/browser/ancestry_fetch.mjs";
@@ -36,7 +39,19 @@ import { extractData as fgEx } from "../extension/site/fg/core/fg_extract_data.m
 import { generalizeData as fgGd } from "../extension/site/fg/core/fg_generalize_data.mjs";
 import { buildCitation as fgBc } from "../extension/site/fg/core/fg_build_citation.mjs";
 
-async function getThisCite(doc, input, fnEx, fnGd, fnBc, fnSd) {
+import { extractDataFromFetch as fsExFetch, extractData as fsEx } from "../extension/site/fs/core/fs_extract_data.mjs";
+import { generalizeData as fsGd } from "../extension/site/fs/core/fs_generalize_data.mjs";
+import { buildCitation as fsBc} from "../extension/site/fs/core/fs_build_citation.mjs";
+import { doFetch as fsDoFetch } from "../extension/site/fs/browser/fs_content.js";
+//import { buildHouseholdTable } from "../../extension/base/core/table_builder.mjs";
+
+// control excess console loggin in this file scope
+var excdbg = false;
+
+// this serves for operations that use the two-arg
+// extractData() function for the site
+// including ancestry where it will also do sharing data
+async function execExtractData(doc, input, fnEx, fnSd) {
     input.extractedData = fnEx(doc, doc.URL);
 
     if (fnSd) {
@@ -45,31 +60,46 @@ async function getThisCite(doc, input, fnEx, fnGd, fnBc, fnSd) {
             input.sharingDataObj = rezult.dataObj;
         }
     }
+}
 
+// this serves for all sites that use standard generalize()
+// and buid() functions on the inoput data
+function generalizeAndBuild(input, fnGd, fnBc) {
+    if (excdbg) console.log("generalizeAndBuild() to call generalizeData with input:");
+    if (excdbg) console.log(input);
     input.generalizedData = fnGd(input);
 
-    console.log("to call buildCitation with input:");
-    console.log(input);
+    if (excdbg) console.log("generalizeAndBuild() to call buildCitation with input:");
+    if (excdbg) console.log(input);
     let rv = fnBc(input);
     return rv;
 }
 
-export async function getCitationFor(doc, options = null) {
-    console.log("Enter getCitationFor: " + doc.URL);
+// if all three steps are standard this will serve
+async function getThisCite(doc, input, fnEx, fnGd, fnBc, fnSd) {
+    await execExtractData(doc, input, fnEx, fnSd);
+    return generalizeAndBuild(input, fnGd, fnBc);
+}
+
+export async function getCitationFor(doc, options = null, dbg = false) {
+    console.log("Enter getCitationFor: " + doc.URL + " debug=" + dbg);
+    excdbg = dbg;
+
     if (options) {
-        console.log("options:");
-        console.log(options);
+        if (excdbg) console.log("options:");
+        if (excdbg) console.log(options);
     }
 
     let domain = (new URL(doc.URL));
     let hostname = domain.hostname;
+    let path = domain.pathname;
 
     let input = [];
     input.runDate = new Date();
     input.type = "inline";
     input.options = getDefaultOptions();
     if (options) {
-        // apply the option overrides
+        // apply any option overrides
         for (var i = 0; i < options.length; i += 2) {
             if (options[i] === "type")
                 input.type = options[i + 1];
@@ -79,15 +109,41 @@ export async function getCitationFor(doc, options = null) {
     }
 
     let rv = {url: doc.URL, message: "unrecognized hostname " + hostname, citation: null};
-    //let rv["message"] = "unrecognized hostname " + hostname;
 
     let citationObject = null;
-    if (hostname.includes("ancestry."))
-        citationObject = await getThisCite(doc, input, extractData, generalizeData, buildCitation, fetchAncestrySharingDataObj);
-    else if (hostname.includes("findagrave."))
+    if (hostname.includes("ancestry.")) {
+        citationObject = await getThisCite(doc, input, ancEx, ancGd, ancBc, fetchAncestrySharingDataObj);
+    } else if (hostname.includes("findagrave.")) {
         citationObject = await getThisCite(doc, input, fgEx, fgGd, fgBc, null);
-    else
+    } else if (hostname.includes("familysearch.org")) {
+        if (path.startsWith("/ark:/61903/3:1:")) {
+            if (excdbg) console.log("familysearch image");
+            citationObject = await getThisCite(doc, input, fsEx, fsGd, fsBc, null);
+        } else if (path.startsWith("/ark:/61903/1:1:")) {
+            if (excdbg) console.log("familysearch record");
+            let fetchResult = await fsDoFetch();
+            if (!fetchResult.success) {
+                if (excdbg) console.log("familysearch doFetch failed");
+                rv.message += "; fetch failed";
+                return rv;
+            }
+            if (excdbg) {
+                console.log("result from doFetch:");
+                console.log(fetchResult);
+            }
+            input.extractedData = fsExFetch(doc, fetchResult.dataObj, fetchResult.fetchType, options);
+            if (excdbg) {
+                console.log("extractedData from fsFetchEx:");
+                console.log(input.extractedData);
+            }
+            citationObject = generalizeAndBuild(input, fsGd, fsBc);
+        }
+    }
+
+    if (citationObject == null) {
+        if (excdbg) console.log(rv.message);
         return rv;
+    }
 
     rv.citation = citationObject.citation;
     rv.message = "returning citation of type: " + citationObject.type;
